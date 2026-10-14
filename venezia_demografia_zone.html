@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Venezia — Andamento demografico per zona 1871–2025</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{--ink:#14213d;--gold:#c9a256;--paper:#f6f1e7;--card:#fffdf8;--line:#e2d9c6;--mut:#6b7280;
+--cs:#14213d;--est:#c9a256;--tf:#2a9d8f}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 'IBM Plex Sans',sans-serif}
+header{background:var(--ink);color:#fff;padding:32px 20px 28px;border-bottom:4px solid var(--gold)}
+.w{max-width:1100px;margin:0 auto;padding:0 20px}header .w{padding:0}
+h1{font:700 clamp(26px,4vw,40px)/1.15 'Source Serif 4',serif;margin:0 0 6px}
+header p{margin:0;color:#cfd6e4;max-width:680px}
+h2{font:600 21px 'Source Serif 4',serif;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin:0 0 14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px;margin:20px 0}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:20px 0}
+.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;border-top:3px solid var(--c,var(--gold))}
+.k b{display:block;font:500 26px 'IBM Plex Mono',monospace}.k span{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.k i{font-style:normal;font-size:13px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media(max-width:800px){.grid{grid-template-columns:minmax(0,1fr)}}
+.ctl{display:flex;align-items:center;gap:12px;margin:0 0 12px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;border:1px solid var(--ink);background:#fff;color:var(--ink);border-radius:20px;padding:5px 14px}
+button.on{background:var(--ink);color:#fff}
+#play{width:38px;height:38px;border-radius:50%;padding:0;background:var(--ink);color:#fff;font-size:14px}
+.yr{font:500 30px 'IBM Plex Mono',monospace;min-width:70px}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--gold)}
+select{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#fff}
+svg{width:100%;height:auto;display:block}.axis text{font:11px 'IBM Plex Mono',monospace;fill:var(--mut)}
+.axis path,.axis line{stroke:var(--line)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}th{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+td{font-family:'IBM Plex Mono',monospace}td:first-child{font-family:'IBM Plex Sans'}
+.pos{color:#2a9d8f}.neg{color:#c0392b}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;padding:8px 10px;border-radius:6px;font-size:12px;opacity:0;z-index:9}
+.warn{background:#fff4d6;border:1px solid #e0b84a;border-left:4px solid #d98e04;border-radius:6px;padding:10px 12px;margin:0 0 12px;font-size:13px;display:none}
+tr.w1 td.fl{background:#fff4d6}.fl sup{color:#d98e04;font-weight:700;margin-left:3px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+footer{font-size:12px;color:var(--mut);padding:0 0 40px}footer p{margin:4px 0}
+</style></head><body>
+<header><div class="w"><h1>Venezia: dove vivono i veneziani</h1>
+<p>Popolazione residente del Comune di Venezia per zona — Centro storico, Estuario e Terraferma — dal 1871 al 2025.</p></div></header>
+<main class="w">
+<div class="kpi" id="kpi"></div>
+
+<section><h2>Come si divide la popolazione</h2>
+<p class="sub">Muovi il cursore o premi play: il grafico a torta mostra la quota di ciascuna zona nell'anno scelto.</p>
+<div class="ctl"><button id="play" aria-label="Play">▶</button><span class="yr" id="yr"></span>
+<input type="range" id="sl"><span><button id="mAbs" class="on">Residenti</button> <button id="mPct">%</button></span></div>
+<div class="grid"><svg id="pie" viewBox="0 0 420 380"></svg><div id="leg"></div></div></section>
+
+<section><h2>Evoluzione nel tempo</h2>
+<p class="sub">Residenti per zona. Le fasce tratteggiate indicano periodi senza dati (1891 e 1937–1950): il grafico è interrotto, nulla è stimato né interpolato.</p>
+<div class="ctl"><button id="vStack" class="on">Area impilata</button><button id="vLine">Linee</button><button id="vIdx">Indice 1951=100</button></div>
+<svg id="ts" viewBox="0 0 1000 420"></svg></section>
+
+<section><h2>Confronto tra due anni</h2>
+<div class="ctl">Da <select id="a"></select> a <select id="b"></select></div>
+<div class="warn" id="warn"></div>
+<table><thead><tr><th>Zona</th><th id="ha"></th><th id="hb"></th><th>Var. ass.</th><th>Var. %</th></tr></thead><tbody id="tb"></tbody></table></section>
+</main>
+<div class="tip" id="tip"></div>
+<footer class="w"><p><b>Fonte:</b> Comune di Venezia – Servizio Elettorale e Leva Militare, Statistica, su dati di Anagrafe Comunale, anni vari. Serie 1871–2025 (il foglio originale è intitolato «anni 1871-2024», ma contiene anche il 2025).</p>
+<p><b>Aggiornamento:</b> la fonte non riporta una data di aggiornamento; l'ultimo salvataggio del file di origine risale al 20 gennaio 2026.</p>
+<p><b>Note:</b> 1871–1936 dati censuari; 1951 primo censimento del dopoguerra; dal 1981 il totale comprende i cittadini «senza fissa dimora». <b>Dal 1999 il totale è al netto di Cavallino-Treporti</b> (comune autonomo dal 02.04.1999): il calo dell'Estuario tra 1998 e 1999 (−12.218 residenti) è dovuto a questo cambio di confini, non a un calo demografico.</p></footer>
+<script>
+const RAW=[[1871,128787,19457,16356,164600],[1881,129851,18512,17045,165408],[1901,146682,21064,20597,188343],[1911,154891,23670,28580,207141],[1921,159262,26769,37419,223450],[1931,163559,32826,53937,250322],[1936,163849,34520,65658,264027],[1951,174808,44037,96966,315811],[1952,174448,44543,100124,319115],[1953,172195,45368,105018,322581],[1954,170446,45875,110232,326553],[1955,167069,46615,115777,329461],[1956,162834,47126,122015,331975],[1957,158466,47624,129629,335719],[1958,154268,48120,137469,339857],[1959,150242,48823,145282,344347],[1960,145402,49025,152575,347002],[1961,137150,49702,161035,347887],[1962,132148,50026,168201,350375],[1963,129468,50099,176094,355661],[1964,126808,50388,183045,360241],[1965,123733,51079,188907,363719],[1966,121309,51125,193314,365748],[1967,118889,51205,196720,366814],[1968,116270,51117,200445,367832],[1969,113587,51142,202902,367631],[1970,111550,50729,205249,367528],[1971,108426,48747,205829,363002],[1972,106516,49339,207685,363540],[1973,106806,49755,209640,366201],[1974,105656,49864,209911,365431],[1975,104206,49670,210674,364550],[1976,102269,49713,210512,362494],[1977,100608,49690,209995,360293],[1978,99189,49642,209435,358266],[1979,97280,49632,208953,355865],[1980,95222,49420,207811,352453],[1981,93598,49203,206707,349508],[1982,92118,49295,204817,346230],[1983,90414,49108,203115,342637],[1984,87936,48885,201429,338250],[1985,86072,48584,200084,334740],[1986,84355,48317,198577,331249],[1987,82703,47972,196851,327526],[1988,80988,47676,195498,324162],[1989,79487,47480,193894,320861],[1990,78165,47271,192270,317706],[1991,76644,47057,190136,313837],[1992,75159,46911,187783,309853],[1993,73149,46448,184885,304482],[1994,72037,46186,183294,301517],[1995,71053,45840,182072,298965],[1996,69906,45651,180899,296456],[1997,68600,45382,179745,293727],[1998,67838,45063,178630,291531],[1999,66945,32845,177515,277305],[2000,66386,32451,176531,275368],[2001,65695,32183,176290,274168],[2002,64076,31767,174915,270758],[2003,63947,31670,176046,271663],[2004,63353,31393,176505,271251],[2005,62296,31035,176449,269780],[2006,61611,30702,176621,268934],[2007,60755,30589,177649,268993],[2008,60311,30415,179372,270098],[2009,59942,30197,180662,270801],[2010,59621,29933,181330,270884],[2011,58991,29693,181905,270589],[2012,58215,29418,181494,269127],[2013,56683,29054,179149,264886],[2014,56311,28792,179476,264579],[2015,55589,28514,179249,263352],[2016,54705,28197,179003,261905],[2017,53799,27983,179539,261321],[2018,52996,27730,179794,260520],[2019,52143,27578,179576,259297],[2020,51208,27179,177759,256146],[2021,50434,26795,177621,254850],[2022,49665,26530,176979,253174],[2023,49129,26264,176947,252340],[2024,48489,25947,177365,251801],[2025,47625,25538,178131,251294]]; // [anno, centro storico, estuario, terraferma, totale]
+const Z=[{k:'cs',n:'Centro storico',c:'#14213d'},{k:'est',n:'Estuario',c:'#c9a256'},{k:'tf',n:'Terraferma',c:'#2a9d8f'}];
+const D=RAW.map(r=>({y:r[0],cs:r[1],est:r[2],tf:r[3],tot:r[4]}));
+const by=Object.fromEntries(D.map(d=>[d.y,d])),Y=D.map(d=>d.y),fmt=d3.format(',').bind(null),it=n=>fmt(n).replace(/,/g,'.');
+const sgn=n=>(n>0?'+':n<0?'−':'')+it(Math.abs(n)),pc=(n)=>(n>0?'+':n<0?'−':'')+Math.abs(n).toFixed(1).replace('.',',')+'%';
+const tip=d3.select('#tip'),mv=(e,h)=>tip.style('opacity',1).html(h).style('left',(e.clientX+14)+'px').style('top',(e.clientY+14)+'px'),hd=()=>tip.style('opacity',0);
+// KPI
+const f=D[0],l=D[D.length-1],pk=D.reduce((a,b)=>b.tot>a.tot?b:a);
+const kp=[['Residenti '+l.y,it(l.tot),pc((l.tot/pk.tot-1)*100)+' dal picco','#c9a256'],
+['Picco storico '+pk.y,it(pk.tot),'(comprendeva Cavallino-Treporti)','#14213d'],
+['Centro storico '+l.y,it(l.cs),pc((l.cs/by[1951].cs-1)*100)+' dal 1951','#14213d'],
+['Terraferma '+l.y,it(l.tf),(l.tf/l.tot*100).toFixed(1).replace('.',',')+'% del comune','#2a9d8f']];
+d3.select('#kpi').html(kp.map(k=>`<div class="k" style="--c:${k[3]}"><span>${k[0]}</span><b>${k[1]}</b><i>${k[2]}</i></div>`).join(''));
+// PIE
+let mode='abs',cur=l.y,timer=null;
+const sl=d3.select('#sl').attr('min',0).attr('max',Y.length-1).attr('value',Y.length-1);
+const R=140,arc=d3.arc().innerRadius(65).outerRadius(R),arcH=d3.arc().innerRadius(65).outerRadius(R+8);
+const pie=d3.pie().sort(null).value(d=>d.v).padAngle(.012);
+const pg=d3.select('#pie').append('g').attr('transform','translate(210,190)');
+const ctr=pg.append('text').attr('text-anchor','middle').attr('y',-2).style('font','500 22px IBM Plex Mono'),
+ctr2=pg.append('text').attr('text-anchor','middle').attr('y',18).style('font','11px IBM Plex Sans').style('fill','#6b7280').text('residenti');
+function drawPie(){
+ const d=by[cur],data=Z.map(z=>({...z,v:d[z.k]}));
+ d3.select('#yr').text(cur);ctr.text(it(d.tot));
+ const sel=pg.selectAll('path').data(pie(data),x=>x.data.k);
+ sel.join(e=>e.append('path').attr('fill',x=>x.data.c).each(function(x){this._c=x}))
+  .on('mousemove',(e,x)=>mv(e,`<b>${x.data.n}</b><br>${it(x.data.v)} residenti<br>${(x.data.v/d.tot*100).toFixed(1).replace('.',',')}%`))
+  .on('mouseleave',hd)
+  .transition().duration(350).attrTween('d',function(x){const i=d3.interpolate(this._c||x,x);this._c=x;return t=>arc(i(t))});
+ const lab=pg.selectAll('text.pl').data(pie(data),x=>x.data.k);
+ lab.join('text').attr('class','pl').attr('text-anchor','middle').style('font','600 12px IBM Plex Sans').style('fill','#fff').style('pointer-events','none')
+  .transition().duration(350).attr('transform',x=>`translate(${arc.centroid(x).map(v=>v*1.0)})`)
+  .text(x=>x.endAngle-x.startAngle>.35?(x.data.v/d.tot*100).toFixed(0)+'%':'');
+ d3.select('#leg').html(Z.map(z=>{const p=d[z.k]/d.tot*100,prev=by[Y[Math.max(0,Y.indexOf(cur)-1)]];
+  return `<div style="margin:0 0 16px"><span class="dot" style="background:${z.c}"></span><b>${z.n}</b>
+  <div style="font:500 24px IBM Plex Mono">${mode==='abs'?it(d[z.k]):p.toFixed(1).replace('.',',')+'%'}</div>
+  <div class="sub" style="margin:0">${mode==='abs'?p.toFixed(1).replace('.',',')+'% del totale':it(d[z.k])+' residenti'}</div></div>`}).join('')+
+  (cur<1999&&cur>=1951?'':'')+(cur>=1999?'<p class="sub">Totale al netto di Cavallino-Treporti (dal 1999).</p>':''));
+}
+function setYear(i){cur=Y[i];sl.property('value',i);drawPie()}
+sl.on('input',function(){stop();setYear(+this.value)});
+function stop(){if(timer){timer.stop();timer=null;d3.select('#play').text('▶')}}
+d3.select('#play').on('click',()=>{if(timer)return stop();d3.select('#play').text('❚❚');
+ let i=Y.indexOf(cur);if(i>=Y.length-1)i=-1;
+ timer=d3.interval(()=>{i++;if(i>=Y.length){stop();return}setYear(i)},350)});
+d3.select('#mAbs').on('click',()=>{mode='abs';d3.select('#mAbs').attr('class','on');d3.select('#mPct').attr('class','');drawPie()});
+d3.select('#mPct').on('click',()=>{mode='pct';d3.select('#mPct').attr('class','on');d3.select('#mAbs').attr('class','');drawPie()});
+drawPie();
+// TIME SERIES
+const M={t:20,r:20,b:30,l:62},W=1000,H=420,svg=d3.select('#ts'),g=svg.append('g').attr('transform',`translate(${M.l},${M.t})`),iw=W-M.l-M.r,ih=H-M.t-M.b;
+const x=d3.scaleLinear().domain([1871,2025]).range([0,iw]),y=d3.scaleLinear().range([ih,0]);
+const gx=g.append('g').attr('class','axis').attr('transform',`translate(0,${ih})`),gy=g.append('g').attr('class','axis'),gp=g.append('g'),lay=g.append('g'),
+ ann=g.append('g'),hov=g.append('line').attr('stroke','#999').attr('stroke-dasharray','3').attr('y1',0).attr('y2',ih).style('opacity',0);
+let view='stack';
+const GAPS=[[1881,1901,'1891 non disponibile'],[1936,1951,'1937–1950 non disponibili']];
+const segs=[];{let s=0;for(let i=1;i<=D.length;i++)if(i===D.length||D[i].y-D[i-1].y>10){segs.push([s,i]);s=i}}
+svg.append('defs').html('<pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#f3ede0"/><line x1="0" y1="0" x2="0" y2="7" stroke="#d8ccb2" stroke-width="2"/></pattern>');
+function drawTS(){
+ const idx=view==='idx',val=(d,k)=>idx?d[k]/by[1951][k]*100:d[k];
+ let series;
+ if(view==='stack'){const st=d3.stack().keys(Z.map(z=>z.k))(D);series=st;y.domain([0,d3.max(D,d=>d.tot)]).nice()}
+ else{y.domain([0,d3.max(D,d=>d3.max(Z,z=>val(d,z.k)))]).nice()}
+ gx.call(d3.axisBottom(x).tickFormat(d3.format('d')).ticks(10));gy.transition().call(d3.axisLeft(y).ticks(6).tickFormat(idx?d=>d:d3.format('.2s')));
+ lay.selectAll('*').remove();gp.selectAll('*').remove();
+ GAPS.forEach(([a,b,t])=>{gp.append('rect').attr('x',x(a)).attr('width',x(b)-x(a)).attr('y',0).attr('height',ih).attr('fill','url(#hatch)');
+  gp.append('text').attr('transform',`translate(${(x(a)+x(b))/2+4},${ih/2}) rotate(-90)`).attr('text-anchor','middle').style('font','11px IBM Plex Sans').style('fill','#6b7280').text(t)});
+ if(view==='stack'){series.forEach((s,i)=>segs.forEach(([a,b])=>lay.append('path').datum(s.slice(a,b)).attr('fill',Z[i].c).attr('opacity',.9)
+  .attr('d',d3.area().x(d=>x(d.data.y)).y0(d=>y(d[0])).y1(d=>y(d[1])))))}
+ else{Z.forEach(z=>segs.forEach(([a,b])=>lay.append('path').datum(D.slice(a,b)).attr('fill','none').attr('stroke',z.c).attr('stroke-width',2.5)
+  .attr('d',d3.line().x(d=>x(d.y)).y(d=>y(val(d,z.k))))));
+  if(idx)lay.append('line').attr('x1',0).attr('x2',iw).attr('y1',y(100)).attr('y2',y(100)).attr('stroke','#999').attr('stroke-dasharray','4')}
+ ann.selectAll('*').remove();
+ ann.append('line').attr('x1',x(1999)).attr('x2',x(1999)).attr('y1',0).attr('y2',ih).attr('stroke','#c0392b').attr('stroke-dasharray','4');
+ ann.append('text').attr('x',x(1999)-6).attr('y',12).attr('text-anchor','end').style('font','11px IBM Plex Sans').style('fill','#c0392b').text('1999: Cavallino-Treporti lascia il comune');
+ Z.forEach((z,i)=>{const d=l,yy=view==='stack'?y((series[i][series[i].length-1][0]+series[i][series[i].length-1][1])/2):y(val(d,z.k));
+  ann.append('text').attr('x',iw-6).attr('y',yy).attr('text-anchor','end').attr('dy','.35em').style('font','600 12px IBM Plex Sans').style('fill',view==='stack'?'#fff':z.c).text(z.n)});
+}
+svg.append('rect').attr('x',M.l).attr('y',M.t).attr('width',iw).attr('height',ih).attr('fill','none').attr('pointer-events','all')
+ .on('mousemove',e=>{const p=d3.pointer(e,g.node()),yr=x.invert(p[0]),d=D.reduce((a,b)=>Math.abs(b.y-yr)<Math.abs(a.y-yr)?b:a);
+  hov.style('opacity',1).attr('x1',x(d.y)).attr('x2',x(d.y));
+  mv(e,`<b>${d.y}</b><br>`+Z.map(z=>`<span class="dot" style="background:${z.c}"></span>${z.n}: ${view==='idx'?(d[z.k]/by[1951][z.k]*100).toFixed(1).replace('.',','):it(d[z.k])}`).join('<br>')+(view==='idx'?'':`<br><b>Totale: ${it(d.tot)}</b>`))})
+ .on('mouseleave',()=>{hd();hov.style('opacity',0)});
+[['vStack','stack'],['vLine','line'],['vIdx','idx']].forEach(([id,v])=>d3.select('#'+id).on('click',()=>{view=v;['vStack','vLine','vIdx'].forEach(i=>d3.select('#'+i).attr('class',i===id?'on':''));drawTS()}));
+drawTS();
+// TABLE
+const A=d3.select('#a'),B=d3.select('#b');
+[A,B].forEach(s=>s.selectAll('option').data(Y).join('option').attr('value',d=>d).text(d=>d));
+A.property('value',1951);B.property('value',2025);
+function drawTB(){let a=by[+A.property('value')],b=by[+B.property('value')];
+ const cross=Math.min(a.y,b.y)<1999&&Math.max(a.y,b.y)>=1999;
+ d3.select('#warn').style('display',cross?'block':'none').html(cross?'<b>⚠ Confronto a cavallo del 1999.</b> Dal 1999 il totale è al netto di Cavallino-Treporti, diventato comune autonomo: le variazioni di <b>Estuario</b> e <b>Totale comune</b> (evidenziate) includono il cambio di confini e non misurano solo la dinamica demografica. Centro storico e Terraferma non mostrano la discontinuità.':'');
+ d3.select('#ha').text(a.y);d3.select('#hb').text(b.y);
+ const rows=[...Z,{k:'tot',n:'Totale comune',c:'#999'}];
+ d3.select('#tb').html(rows.map(z=>{const dv=b[z.k]-a[z.k],p=dv/a[z.k]*100,cl=dv>=0?'pos':'neg',t=z.k==='tot';
+  const fx=cross&&(z.k==='est'||t),m=fx?'<sup title="Include il cambio di confini del 1999">⚠</sup>':'',c2=fx?' fl':'';
+  return `<tr style="${t?'font-weight:600':''}"><td><span class="dot" style="background:${z.c}"></span>${z.n}</td><td>${it(a[z.k])}</td><td>${it(b[z.k])}</td><td class="${cl}${c2}">${sgn(dv)}</td><td class="${cl}${c2}">${pc(p)}${m}</td></tr>`}).join(''))}
+A.on('change',drawTB);B.on('change',drawTB);drawTB();
+</script></body></html>
